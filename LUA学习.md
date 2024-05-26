@@ -361,9 +361,253 @@ end
 
 ### 11). 文件I/O
 
+Lua I/O 库用于读取和处理文件。分为简单模式（和C一样）、完全模式。
+
+- 简单模式（simple model）拥有一个当前输入文件和一个当前输出文件，并且提供针对这些文件相关的操作。
+- 完全模式（complete model） 使用外部的文件句柄来实现。它以一种面对对象的形式，将所有的文件操作定义为文件句柄的方法
+
+简单模式在做一些简单的文件操作时较为合适。但是在进行一些高级的文件操作的时候，简单模式就显得力不从心。例如同时读取多个文件这样的操作，使用完全模式则较为合适。
+
+#### 11.1 简单模式
+
+| 模式 | 描述                                                         |
+| :--- | :----------------------------------------------------------- |
+| r    | 以只读方式打开文件，该文件必须存在。                         |
+| w    | 打开只写文件，若文件存在则文件长度清为0，即该文件内容会消失。若文件不存在则建立该文件。 |
+| a    | 以附加的方式打开只写文件。若文件不存在，则会建立该文件，如果文件存在，写入的数据会被加到文件尾，即文件原先的内容会被保留。（EOF符保留） |
+| r+   | 以可读写方式打开文件，该文件必须存在。                       |
+| w+   | 打开可读写文件，若文件存在则文件长度清为零，即该文件内容会消失。若文件不存在则建立该文件。 |
+| a+   | 与a类似，但此文件可读可写                                    |
+| b    | 二进制模式，如果文件是二进制文件，可以加上b                  |
+| +    | 号表示对文件既可以读也可以写                                 |
+
+
+
+简单模式使用标准的 I/O 或使用一个当前输入文件和一个当前输出文件。
+
+```lua
+-- 以只读方式打开文件
+file = io.open("test.lua", "r")
+
+-- 设置默认输入文件为 test.lua
+io.input(file)
+
+-- 输出文件第一行
+print(io.read())
+
+-- 关闭打开的文件
+io.close(file)
+
+-- 以附加的方式打开只写文件
+file = io.open("test.lua", "a")
+
+-- 设置默认输出文件为 test.lua
+io.output(file)
+
+-- 在文件最后一行添加 Lua 注释
+io.write("--  test.lua 文件末尾注释")
+
+-- 关闭打开的文件
+io.close(file)
+```
+
+
+
+在以上实例中我们使用了 io."x" 方法，其中 io.read() 中我们没有带参数，参数可以是下表中的一个：
+
+| 模式         | 描述                                                         |
+| :----------- | :----------------------------------------------------------- |
+| "*n"         | 读取一个数字并返回它。例：file.read("*n")                    |
+| "*a"         | 从当前位置读取整个文件。例：file.read("*a")                  |
+| "*l"（默认） | 读取下一行，在文件尾 (EOF) 处返回 nil。例：file.read("*l")   |
+| number       | 返回一个指定字符个数的字符串，或在 EOF 时返回 nil。例：file.read(5) |
+
+其他的 io 方法有：
+
+- **io.tmpfile():**返回一个临时文件句柄，该文件以更新模式打开，程序结束时自动删除
+- **io.type(file):** 检测obj是否一个可用的文件句柄
+- **io.flush():** 向文件写入缓冲中的所有数据
+- **io.lines(optional file name):** 返回一个迭代函数，每次调用将获得文件中的一行内容，当到文件尾时，将返回 nil，但不关闭文件。
+
+
+
+#### 11.2 完全模式
+
+通常需要在同一时间处理多个文件。需要使用 file:function_name 来代替 io.function_name 方法。以下实例演示了如何同时处理同一个文件:
+
+```lua
+-- 以只读方式打开文件
+file = io.open("test.lua", "r")
+
+-- 输出文件第一行
+print(file:read())
+
+-- 关闭打开的文件
+file:close()
+
+-- 以附加的方式打开只写文件
+file = io.open("test.lua", "a")
+
+-- 在文件最后一行添加 Lua 注释
+file:write("--test")
+
+-- 关闭打开的文件
+file:close()
+```
+
+
+
+执行以上代码，输出了 test.lua 文件的第一行信息，并在该文件最后一行添加了 lua 的注释。如输出的是：
+
+```
+-- test.lua 文件
+```
+
+read 的参数与简单模式一致。
+
+其他方法:
+
+- **file:seek(optional whence, optional offset):** 设置和获取当前文件位置,成功则返回最终的文件位置(按字节),失败则返回nil加错误信息。参数 whence 值可以是:
+
+  - "set": 从文件头开始
+  - "cur": 从当前位置开始[默认]
+  - "end": 从文件尾开始
+  - offset:默认为0
+
+  不带参数file:seek()则返回当前位置,file:seek("set")则定位到文件头,file:seek("end")则定位到文件尾并返回文件大小
+
+- **file:flush():** 向文件写入缓冲中的所有数据
+
+- **io.lines(optional file name):** 打开指定的文件 filename 为读模式并返回一个迭代函数，每次调用将获得文件中的一行内容，当到文件尾时，将返回 nil，并自动关闭文件。
+  若不带参数时io.lines() <=> io.input():lines(); 读取默认输入设备的内容，但结束时不关闭文件，如：
+
+  ```
+  for line in io.lines("main.lua") do
+  　　print(line)
+  end
+  ```
+
+以下实例使用了 seek 方法，定位到文件倒数第 25 个位置并使用 read 方法的 *a 参数，即从当前位置(倒数第 25 个位置)读取整个文件。
+
+
+```lua
+-- 以只读方式打开文件
+file = io.open("test.lua", "r")
+
+file:seek("end",-25)
+print(file:read("*a"))
+
+-- 关闭打开的文件
+file:close()
+```
+
+边输出的结果是：
+
+```
+st.lua 文件末尾--test
+```
+
 
 
 ### 12). 错误
+
+错误类型有：
+
+- 语法错误
+- 运行错误
+
+#### 12.1 语法错误
+
+语法错误通常是由于对程序的组件（如运算符、表达式）使用不当引起的。
+
+```lua
+-- test.lua 文件
+a == 2
+
+-- 以上代码执行结果为：lua: test.lua:2: syntax error near '=='
+-- 以上出现了语法错误，一个 "=" 号跟两个 "=" 号是有区别的。一个 "=" 是赋值表达式两个 "=" 是比较运算。
+
+for a= 1,10
+   print(a)
+end
+-- 执行以上程序会出现如下错误：lua: test2.lua:2: 'do' expected near 'print'
+-- 语法错误比程序运行错误更简单，运行错误无法定位具体错误，而语法错误我们可以很快的解决，如以上只要在for语句下添加 do 即可：
+for a= 1,10
+do
+   print(a)
+end
+```
+
+
+#### 12.2 运行错误
+
+```lua
+-- 运行错误是程序可以正常执行，但是会输出报错信息。如下实例由于参数输入错误，程序执行时报错：
+function add(a,b)
+   return a+b
+end
+
+add(10)
+
+-- 当我们编译运行以下代码时，编译是可以成功的，但在运行的时候会产生如下错误：
+-- lua: test2.lua:2: attempt to perform arithmetic on local 'b' (a nil value)
+-- stack traceback:
+--    test2.lua:2: in function 'add'
+--    test2.lua:5: in main chunk
+--    [C]: ?
+-- lua 里调用函数时，即使实参列表和形参列表不一致也能成功调用，多余的参数会被舍弃，缺少的参数会被补为 nil。
+-- 以上报错信息是由于参数 b 被补为 nil 后，nil 参与了 + 运算。
+-- 假如 add 函数内不是 "return a+b" 而是 "print(a,b)" 的话，结果会变成 "10 nil" 不会报错。
+```
+
+#### 12.3 错误处理
+
+可以使用两个函数：assert 和 error 来处理错误。
+
+```lua
+local function add(a,b)
+   assert(type(a) == "number", "a 不是一个数字")
+   assert(type(b) == "number", "b 不是一个数字")
+   return a+b
+end
+add(10)
+-- lua: test.lua:3: b 不是一个数字
+-- stack traceback:
+--    [C]: in function 'assert'
+--    test.lua:3: in local 'add'
+--    test.lua:6: in main chunk
+--    [C]: in ?
+-- assert首先检查第一个参数，若没问题，assert不做任何事情；否则，assert以第二个参数作为错误信息抛出。
+-- error函数语法格式：
+error (message [, level])
+-- 功能：终止正在执行的函数，并返回message的内容作为错误信息(error函数永远都不会返回)
+-- 通常情况下，error会附加一些错误位置的信息到message头部。
+-- Level参数指示获得错误的位置:
+-- Level=1[默认]：为调用error位置(文件+行号)
+-- Level=2：指出哪个调用error的函数的函数
+-- Level=0:不添加错误位置信息
+
+-- 
+
+```
+
+
+
+pcall和xpcall、debug
+
+pcall接收一个函数和要传递给后者的参数，并执行，执行结果：有错误、无错误；返回值true或者或false, errorinfo。
+
+语法格式如下:
+
+```lua
+if pcall(function_name, ….) then
+-- 没有错误
+else
+-- 一些错误
+end
+```
+
+
 
 
 
@@ -388,6 +632,40 @@ end
 
 
 ### 18). 数据访问
+
+Lua 连接MySql 数据库：
+
+```lua
+require "luasql.mysql" -- 5.2 版本之后，require 不再定义全局变量，需要保存其返回值。 require "luasql.mysql" => luasql = require "luasql.mysql"
+
+--创建环境对象
+env = luasql.mysql()
+
+--连接数据库
+conn = env:connect("数据库名","用户名","密码","IP地址",端口)
+
+--设置数据库的编码格式
+conn:execute"SET NAMES UTF8"
+
+--执行数据库操作
+cur = conn:execute("select * from role")
+
+row = cur:fetch({},"a")
+
+--文件对象的创建
+file = io.open("role.txt","w+");
+
+while row do
+    var = string.format("%d %s\n", row.id, row.name)
+    print(var)
+    file:write(var)
+    row = cur:fetch(row,"a")
+end
+
+file:close()  --关闭文件对象
+conn:close()  --关闭数据库连接
+env:close()   --关闭数据库环境
+```
 
 
 
